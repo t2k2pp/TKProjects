@@ -60,16 +60,10 @@ class PromptGenerator:
 以上の条件に基づいて、選択された題材からショートショートをアーティファクトで執筆してください。PM知識を自然に物語に織り込みながら、読者が楽しめて共感でき、かつ実践的な学びが得られる内容を目指してください。\r\n\
 "        
         # Azure OpenAI APIの設定
-        # https://graderpm.openai.azure.com/openai/deployments/gpt-4o-202411/chat/completions?api-version=2025-01-01-preview
-        # self.api_base = tk.StringVar(value="https://graderpm.openai.azure.com/")
-        # self.api_key = tk.StringVar(value="4aa77d559b174a92a3728411d399154d")
-        # self.model_id = tk.StringVar(value="gpt-4o-202411")
-        # self.api_version = tk.StringVar(value="2024-12-01-preview")
-        # https://graderpmjpje.openai.azure.com/openai/deployments/gpt-4o-ag/chat/completions?api-version=2025-01-01-preview
-        self.api_base = tk.StringVar(value="https://graderpmjpje.openai.azure.com/")
-        self.api_key = tk.StringVar(value="30358ce5e16847b185b1e09c31e597ee")
-        self.model_id = tk.StringVar(value="gpt-4o-ag")
-        self.api_version = tk.StringVar(value="2025-01-01-preview")
+        self.api_base = tk.StringVar(value="")
+        self.api_key = tk.StringVar(value="")
+        self.model_id = tk.StringVar(value="")
+        self.api_version = tk.StringVar(value="")
         
         # 初期化時にファイル選択ダイアログを表示
         self.select_file()

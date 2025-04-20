@@ -5,16 +5,20 @@ import win32gui
 import win32process
 import win32con
 import win32api
+import win32ui
 import threading
 import time
 import os
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import sys
 import tempfile
+import ctypes
 from functools import partial
+import io
 
 class TaskbarApp:
     def __init__(self, root):
+        print(">>> ENTERING __init__") # 追加
         self.root = root
         self.root.title("Tkinterタスクバー")
         self.root.overrideredirect(True)  # タイトルバーを非表示
@@ -23,14 +27,17 @@ class TaskbarApp:
         # 設定値
         self.position = "bottom"  # タスクバーの位置（"bottom", "top", "left", "right"）
         self.update_interval = 2  # プロセス更新間隔（秒）
-        self.display_mode = "compact"  # 表示モード（"compact": 詰めて表示, "paged": ページ切り替え）
+        self.display_mode = "paged"  # 表示モード（"compact": 詰めて表示, "paged": ページ切り替え）
+        self.label_mode = "title"  # ラベル表示モード（"process": プロセス名, "title": ウィンドウタイトル）
         self.is_visible = True  # タスクバーの表示状態
         self.current_page = 0  # 現在のページ（ページ切り替えモード用）
-        self.buttons_per_page = 10  # 1ページあたりのボタン数
+        self.buttons_per_page = 12  # 1ページあたりのボタン数
         self.taskbar_size = 40  # タスクバーのサイズ（幅または高さ）
         self.button_size = 40  # ボタンのサイズ
+        self.button_width = 120  # ページモード時のボタン幅
         self.tasks = []  # 実行中のタスク
         self.task_buttons = []  # タスクボタンのリスト
+        self.icon_cache = {}  # アイコンのキャッシュ
         
         # 設定パネル
         self.settings_frame = None
@@ -54,8 +61,8 @@ class TaskbarApp:
         # ウィンドウ位置とサイズの初期設定
         self.set_position(self.position)
         
-        # コントロールボタンの作成
-        self.create_control_buttons()
+        # スタートボタンとコントロールボタンの作成
+        # self.create_control_buttons()
         
         # プロセス監視スレッドの開始
         self.stop_thread = False
@@ -73,59 +80,96 @@ class TaskbarApp:
         
         # ESCキーで設定パネルを閉じる
         self.root.bind("<Escape>", lambda e: self.toggle_settings() if self.settings_visible else None)
-        
+        print("<<< LEAVING __init__") # 追加
+
     def set_position(self, position):
+        print(f">>> ENTERING set_position(position='{position}')") # 追加
         """タスクバーの位置を設定する"""
         self.position = position
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        
-        # メインフレームとボタンフレームをいったんアンパック
+
+        # メインフレームとボタンフレーム、コントロールフレームをいったんアンパック
         self.main_frame.pack_forget()
-        self.button_frame.pack_forget()
-        self.control_frame.pack_forget()
-        
+        if self.button_frame.winfo_manager():
+            self.button_frame.pack_forget()
+        if self.control_frame.winfo_manager():
+            self.control_frame.pack_forget()
+
+        # ★★★ 変更点: button_frame 内のすべての子ウィジェットを削除 ★★★
+        for widget in self.button_frame.winfo_children():
+            widget.destroy()
+        self.start_button_widget = None # スタートボタンの参照をクリア
+        self.task_buttons = []         # タスクボタンのリストもクリア (update_task_buttonsでもクリアされるが念のため)
+        # ★★★ 変更点ここまで ★★★
+
+        # ウィンドウジオメトリとボタンの向きを設定
         if position == "bottom":
-            # サイズと位置の設定
             self.root.geometry(f"{screen_width}x{self.taskbar_size}+0+{screen_height-self.taskbar_size}")
-            # フレームの配置
-            self.main_frame.pack(fill=tk.BOTH, expand=True)
-            self.button_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            self.control_frame.pack(side=tk.RIGHT, fill=tk.Y)
-            # ボタンの向き
             self.button_orientation = "horizontal"
-        
         elif position == "top":
-            # サイズと位置の設定
             self.root.geometry(f"{screen_width}x{self.taskbar_size}+0+0")
-            # フレームの配置
-            self.main_frame.pack(fill=tk.BOTH, expand=True)
-            self.button_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            self.control_frame.pack(side=tk.RIGHT, fill=tk.Y)
-            # ボタンの向き
             self.button_orientation = "horizontal"
-        
         elif position == "left":
-            # サイズと位置の設定
             self.root.geometry(f"{self.taskbar_size}x{screen_height}+0+0")
-            # フレームの配置
-            self.main_frame.pack(fill=tk.BOTH, expand=True)
-            self.button_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-            self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
-            # ボタンの向き
             self.button_orientation = "vertical"
-        
         elif position == "right":
-            # サイズと位置の設定
             self.root.geometry(f"{self.taskbar_size}x{screen_height}+{screen_width-self.taskbar_size}+0")
-            # フレームの配置
-            self.main_frame.pack(fill=tk.BOTH, expand=True)
-            self.button_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-            self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
-            # ボタンの向き
             self.button_orientation = "vertical"
+
+        # フレームの再配置
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+
+        if self.button_orientation == "horizontal":
+             self.button_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+             self.control_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        else: # vertical
+             self.button_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+             self.control_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # 新しいスタートボタンを作成して配置
+        self.create_start_button() # ★ button_frame が空の状態で作成
+
+        # コントロールボタンを(再)作成
+        self.create_control_buttons()
+
+        # タスクボタンを更新
+        self.update_task_buttons() # ★ button_frame にタスクボタンを追加        
+        print(f"<<< LEAVING set_position(position='{position}')") # 追加
+    
+    def create_start_button(self):
+        print(">>> ENTERING create_start_button") # 追加
+        """スタートボタンを作成する"""
+        # スタートボタンを作成
+        print("Creating start button")
+        start_button = tk.Button(self.button_frame, text="スタート", 
+                                bg="#0078D7", fg="white", bd=0, 
+                                padx=10, pady=5,
+                                command=self.show_start_menu)
+        
+        # ボタンの配置
+        if self.button_orientation == "horizontal":
+            start_button.pack(side=tk.LEFT, padx=2, pady=2)
+        else:  # vertical
+            start_button.pack(side=tk.TOP, padx=2, pady=2)
+
+        print(f"    Start button created: {self.start_button_widget}") # 追加
+        print("<<< LEAVING create_start_button") # 追加
+    
+    def show_start_menu(self):
+        """スタートメニューを表示する"""
+        try:
+            # Windowsのスタートメニューを呼び出す
+            # Win+Sキーを送信する
+            win32api.keybd_event(win32con.VK_LWIN, 0, 0, 0)  # Winキーを押す
+            win32api.keybd_event(ord('S'), 0, 0, 0)  # Sキーを押す
+            win32api.keybd_event(ord('S'), 0, win32con.KEYEVENTF_KEYUP, 0)  # Sキーを離す
+            win32api.keybd_event(win32con.VK_LWIN, 0, win32con.KEYEVENTF_KEYUP, 0)  # Winキーを離す
+        except Exception as e:
+            print(f"Error showing start menu: {e}")
     
     def create_control_buttons(self):
+        print(">>> ENTERING create_control_buttons") # 追加
         """コントロールボタンを作成する"""
         # 既存のコントロールボタンを削除
         for widget in self.control_frame.winfo_children():
@@ -136,11 +180,12 @@ class TaskbarApp:
                                     bg="#1E1E1E", fg="white", bd=0, padx=5, pady=5,
                                     command=self.toggle_settings)
         settings_button.pack(side=tk.TOP if self.button_orientation == "vertical" else tk.LEFT)
-        
+        # 🥚🐣
         # 表示切替ボタン
-        toggle_button = tk.Button(self.control_frame, text="◀" if self.is_visible else "▶", font=("Arial", 12), 
-                                  bg="#1E1E1E", fg="white", bd=0, padx=5, pady=5,
-                                  command=self.toggle_visibility)
+        toggle_text = "🥚" if self.is_visible else "🐣"
+        toggle_button = tk.Button(self.control_frame, text=toggle_text, font=("Arial", 12), 
+                                 bg="#1E1E1E", fg="white", bd=0, padx=5, pady=5,
+                                 command=self.toggle_visibility)
         toggle_button.pack(side=tk.TOP if self.button_orientation == "vertical" else tk.LEFT)
         
         # ページ切替ボタン（ページモードのみ）
@@ -165,6 +210,11 @@ class TaskbarApp:
                                 bg="#1E1E1E", fg="white", bd=0, padx=5, pady=5,
                                 command=self.on_closing)
         exit_button.pack(side=tk.TOP if self.button_orientation == "vertical" else tk.LEFT)
+        
+        # スタートボタンを作成する
+        # print("スタートボタンを作成する")
+        # self.create_start_button()
+        print("<<< LEAVING create_control_buttons") # 追加
     
     def toggle_settings(self):
         """設定パネルの表示/非表示を切り替える"""
@@ -205,6 +255,17 @@ class TaskbarApp:
                 rb = tk.Radiobutton(mode_frame, text=text, variable=mode_var, value=value)
                 rb.pack(anchor=tk.W)
             
+            # ラベル表示モード設定
+            label_mode_frame = tk.LabelFrame(settings_content, text="ラベル表示モード", padx=5, pady=5)
+            label_mode_frame.pack(fill=tk.X, pady=5)
+            
+            label_mode_var = tk.StringVar(value=self.label_mode)
+            label_modes = [("プロセス名", "process"), ("ウィンドウタイトル", "title")]
+            
+            for text, value in label_modes:
+                rb = tk.Radiobutton(label_mode_frame, text=text, variable=label_mode_var, value=value)
+                rb.pack(anchor=tk.W)
+            
             # ページあたりボタン数設定
             buttons_frame = tk.LabelFrame(settings_content, text="1ページあたりのボタン数", padx=5, pady=5)
             buttons_frame.pack(fill=tk.X, pady=5)
@@ -227,7 +288,8 @@ class TaskbarApp:
                                         position_var.get(),
                                         mode_var.get(),
                                         buttons_var.get(),
-                                        interval_var.get()
+                                        interval_var.get(),
+                                        label_mode_var.get()
                                     ))
             apply_button.pack(pady=10)
             
@@ -239,27 +301,42 @@ class TaskbarApp:
             # ウィンドウが閉じられたときの処理
             self.settings_frame.protocol("WM_DELETE_WINDOW", self.toggle_settings)
     
-    def apply_settings(self, position, display_mode, buttons_per_page, update_interval):
+    def apply_settings(self, position, display_mode, buttons_per_page, update_interval, label_mode):
         """設定を適用する"""
         # 値を更新
-        self.buttons_per_page = buttons_per_page
-        self.update_interval = update_interval
+        changes = False
+        
+        if self.buttons_per_page != buttons_per_page:
+            self.buttons_per_page = buttons_per_page
+            changes = True
+            
+        if self.update_interval != update_interval:
+            self.update_interval = update_interval
+            changes = True
         
         # 表示モードが変更された場合
         if self.display_mode != display_mode:
             self.display_mode = display_mode
             self.current_page = 0  # ページをリセット
+            changes = True
+            
+        # ラベル表示モードが変更された場合
+        if self.label_mode != label_mode:
+            self.label_mode = label_mode
+            changes = True
             
         # 位置が変更された場合
         if self.position != position:
+            old_position = self.position
             self.position = position
-            self.set_position(position)
-        
-        # コントロールボタンを再作成
-        self.create_control_buttons()
-        
-        # タスクボタンを更新
-        self.update_task_buttons()
+            self.set_position(position)  # これによりタスクボタンも更新される
+            changes = True
+        elif changes:
+            # 位置は変更されていないが、他の設定が変更された場合
+            # コントロールボタンを再作成
+            self.create_control_buttons()
+            # タスクボタンを更新
+            self.update_task_buttons()
         
         # 設定パネルを閉じる
         self.toggle_settings()
@@ -270,7 +347,7 @@ class TaskbarApp:
             # 最小限の表示にする
             if self.position in ["bottom", "top"]:
                 current_height = self.taskbar_size
-                new_height = 5  # 最小化時の高さ
+                new_height = 20  # 最小化時の高さ
                 
                 if self.position == "bottom":
                     screen_height = self.root.winfo_screenheight()
@@ -283,7 +360,7 @@ class TaskbarApp:
                 
             else:  # left, right
                 current_width = self.taskbar_size
-                new_width = 5  # 最小化時の幅
+                new_width = 10  # 最小化時の幅
                 
                 if self.position == "left":
                     self.root.geometry(f"{new_width}x{self.root.winfo_height()}+0+0")
@@ -295,13 +372,25 @@ class TaskbarApp:
                 self.button_frame.pack_forget()
             
             self.is_visible = False
+            
+            # コントロールボタンの背景色を変更して目立たせる
+            for widget in self.control_frame.winfo_children():
+                if isinstance(widget, tk.Button):
+                    widget.config(bg="#3E3E3E", fg="#FFFFFF", relief=tk.RAISED)
         else:
             # 元のサイズに戻す
             self.set_position(self.position)
             self.is_visible = True
-        
-        # コントロールボタンを更新
-        self.create_control_buttons()
+            
+            # コントロールボタンの背景色を元に戻す
+            for widget in self.control_frame.winfo_children():
+                if isinstance(widget, tk.Button):
+                    widget.config(bg="#1E1E1E", fg="white", relief=tk.FLAT)
+        # 🥚🐣
+        # コントロールボタンの表示を更新
+        for widget in self.control_frame.winfo_children():
+            if isinstance(widget, tk.Button) and widget.cget("text") in ["🥚", "🐣"]:
+                widget.config(text="🥚" if self.is_visible else "🐣")
     
     def prev_page(self):
         """前のページに移動"""
@@ -337,6 +426,86 @@ class TaskbarApp:
             y = self.root.winfo_y() + (event.y - self.drag_y)
             self.root.geometry(f"+{x}+{y}")
     
+    def get_window_icon(self, hwnd):
+        """ウィンドウのアイコンを取得する"""
+        if hwnd in self.icon_cache:
+            return self.icon_cache[hwnd]
+            
+        try:
+            # アイコンサイズ
+            icon_size = 32
+            
+            # 先にプロセスIDを取得
+            _, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            
+            try:
+                # プロセスの実行ファイルパスを取得
+                process = psutil.Process(process_id)
+                exe_path = process.exe()
+                
+                # アイコンを抽出
+                if os.path.exists(exe_path):
+                    # ファイルからアイコンを抽出
+                    icon_index = 0  # 最初のアイコンを使用
+                    large_icon, small_icon = win32gui.ExtractIconEx(exe_path, icon_index, 1)
+                    
+                    if small_icon:
+                        # アイコンハンドルからPILイメージを作成
+                        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+                        hbmp = win32ui.CreateBitmap()
+                        hbmp.CreateCompatibleBitmap(hdc, icon_size, icon_size)
+                        hdc = hdc.CreateCompatibleDC()
+                        hdc.SelectObject(hbmp)
+                        hdc.DrawIcon((0, 0), small_icon[0])
+                        
+                        # ビットマップからPILイメージを作成
+                        bmpinfo = hbmp.GetInfo()
+                        bmpstr = hbmp.GetBitmapBits(True)
+                        img = Image.frombuffer(
+                            'RGBA',
+                            (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+                            bmpstr, 'raw', 'BGRA', 0, 1
+                        )
+                        
+                        # クリーンアップ
+                        win32gui.DestroyIcon(small_icon[0])
+                        if large_icon:
+                            win32gui.DestroyIcon(large_icon[0])
+                        hdc.DeleteDC()
+                        
+                        # PhotoImageに変換
+                        photo_img = ImageTk.PhotoImage(img)
+                        
+                        # キャッシュに保存
+                        self.icon_cache[hwnd] = photo_img
+                        return photo_img
+            except Exception as e:
+                print(f"Error getting icon for process {process_id}: {e}")
+        
+        except Exception as e:
+            print(f"Error getting icon for window {hwnd}: {e}")
+        
+        # デフォルトアイコンを返す
+        default_icon = self.create_default_icon()
+        self.icon_cache[hwnd] = default_icon
+        return default_icon
+    
+    def create_default_icon(self):
+        """デフォルトのアイコンを作成する"""
+        # サイズの定義
+        size = 32
+        
+        # 画像を作成
+        img = Image.new('RGBA', (size, size), (50, 50, 50, 255))
+        draw = ImageDraw.Draw(img)
+        
+        # 単純な形を描画
+        draw.rectangle([2, 2, size-3, size-3], outline=(200, 200, 200, 255))
+        
+        # PhotoImageに変換
+        photo_img = ImageTk.PhotoImage(img)
+        return photo_img
+    
     def monitor_processes(self):
         """実行中のプロセスを監視する"""
         while not self.stop_thread:
@@ -358,7 +527,6 @@ class TaskbarApp:
         def enum_windows_proc(hwnd, lParam):
             """ウィンドウ列挙用コールバック関数"""
             if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd):
-                # ウィンドウの状態を確認（最小化されているものも含める）
                 # このアプリケーション自体は除外
                 if hwnd != self.root.winfo_id():
                     try:
@@ -376,13 +544,15 @@ class TaskbarApp:
                             width = rect[2] - rect[0]
                             height = rect[3] - rect[1]
                             
-                            # 実際に表示されているウィンドウのみ（幅と高さがある程度あるもの）
-                            if width > 100 and height > 100:
+                            # 実際に表示されているウィンドウのみ（ある程度の幅と高さを持つもの）
+                            # 最小化されたウィンドウも含む
+                            if width > 0 and height > 0 and title:
                                 windowed_processes.append({
                                     'hwnd': hwnd,
                                     'title': title,
                                     'process_id': process_id,
-                                    'process_name': process_name
+                                    'process_name': process_name,
+                                    'is_minimized': win32gui.IsIconic(hwnd)
                                 })
                         except psutil.NoSuchProcess:
                             pass
@@ -395,8 +565,9 @@ class TaskbarApp:
         return windowed_processes
     
     def update_task_buttons(self):
+        print(">>> ENTERING update_task_buttons") # 追加
         """タスクボタンを更新する"""
-        # 既存のボタンをクリア
+        # 既存のボタンをクリア（スタートボタンは除外）
         for button in self.task_buttons:
             button.destroy()
         self.task_buttons = []
@@ -404,7 +575,7 @@ class TaskbarApp:
         # タスクがない場合は何もしない
         if not self.tasks:
             return
-        
+            
         # 表示するタスクを決定
         if self.display_mode == "compact":
             # すべてのタスクを表示
@@ -417,18 +588,27 @@ class TaskbarApp:
         
         # 新しいボタンを作成
         for task in display_tasks:
-            # ボタンラベルの設定（プロセス名を優先、長すぎる場合はトリミング）
-            label = task['process_name'].replace('.exe', '')
-            if not label:
+            # ボタンラベルの設定
+            if self.label_mode == "process":
+                label = task['process_name'].replace('.exe', '')
+                if len(label) > 15:
+                    label = label[:12] + "..."
+            else:  # title
                 label = task['title']
-            if len(label) > 15:
-                label = label[:12] + "..."
-            
+                if len(label) > 15:
+                    label = label[:12] + "..."
+
             # ボタンの作成
             button = tk.Button(
                 self.button_frame,
+                image=self.get_window_icon(task['hwnd']),
+                compound=tk.LEFT,
+                font=("Arial", 10),
+                anchor=tk.W,
+                width=self.button_width,
+                height=self.button_size,
                 text=label,
-                bg="#2D2D2D",
+                bg="#4D4D4D",
                 fg="white",
                 bd=1,
                 relief=tk.RAISED,
@@ -444,6 +624,7 @@ class TaskbarApp:
                 button.pack(side=tk.TOP, padx=2, pady=2)
             
             self.task_buttons.append(button)
+        print("<<< LEAVING update_task_buttons") # 追加
     
     def focus_window(self, hwnd):
         """指定されたウィンドウにフォーカスを当てる"""
