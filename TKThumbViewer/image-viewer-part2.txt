@@ -1,0 +1,653 @@
+progress_win.transient(self.root)
+        progress_win.grab_set()
+        
+        progress_lbl = ttk.Label(progress_win, text="ファイルを移動中...")
+        progress_lbl.pack(pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_win, variable=progress_var, maximum=len(self.checked_images))
+        progress_bar.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 移動処理を別スレッドで実行
+        threading.Thread(target=self._move_files_thread, args=(target_folder, progress_win, progress_var, progress_lbl)).start()
+
+    def _move_files_thread(self, target_folder, progress_win, progress_var, progress_lbl):
+        # ファイル移動の実行
+        moved_count = 0
+        error_count = 0
+        skipped_count = 0
+        
+        # 移動する画像のインデックスリスト（ソート済み）
+        indices_to_move = sorted(self.checked_images)
+        
+        for i, idx in enumerate(indices_to_move):
+            if idx >= len(self.image_files):
+                continue
+                
+            src_path = self.image_files[idx]
+            file_name = os.path.basename(src_path)
+            dst_path = os.path.join(target_folder, file_name)
+            
+            progress_var.set(i + 1)
+            progress_lbl.config(text=f"移動中: {file_name}")
+            progress_win.update_idletasks()
+            
+            try:
+                if os.path.exists(dst_path):
+                    # 同名ファイルが存在する場合
+                    response = messagebox.askyesnocancel(
+                        "確認", 
+                        f"ファイル '{file_name}' は既に存在します。上書きしますか？\n"
+                        "「はい」で上書き、「いいえ」でスキップ、「キャンセル」で処理を中止します。"
+                    )
+                    
+                    if response is None:  # キャンセル
+                        break
+                    elif response:  # はい（上書き）
+                        shutil.move(src_path, dst_path)
+                        moved_count += 1
+                    else:  # いいえ（スキップ）
+                        skipped_count += 1
+                        continue
+                else:
+                    shutil.move(src_path, dst_path)
+                    moved_count += 1
+                    
+            except Exception as e:
+                error_count += 1
+                print(f"移動エラー: {e}")
+        
+        # 処理完了
+        progress_win.destroy()
+        
+        # 結果表示
+        result_msg = f"{moved_count}個のファイルを移動しました。"
+        if skipped_count > 0:
+            result_msg += f"\n{skipped_count}個のファイルをスキップしました。"
+        if error_count > 0:
+            result_msg += f"\n{error_count}個のファイルでエラーが発生しました。"
+            
+        messagebox.showinfo("移動完了", result_msg)
+        
+        # 移動後は画像リストを更新
+        if moved_count > 0:
+            self.load_images(self.current_folder)
+
+    def rename_checked_images(self):
+        # チェックした画像をリネーム
+        if not self.checked_images:
+            messagebox.showinfo("情報", "リネームする画像が選択されていません。")
+            return
+            
+        # リネームダイアログを表示
+        rename_dialog = RenameDialog(self.root, len(self.checked_images))
+        if not rename_dialog.result:
+            return
+            
+        # リネーム情報を取得
+        base_name = rename_dialog.base_name
+        start_number = rename_dialog.start_number
+        digits = rename_dialog.digits
+        
+        # 確認ダイアログ
+        if not messagebox.askyesno("確認", "選択した画像をリネームしますか？"):
+            return
+            
+        # リネームの実行
+        renamed_count = 0
+        error_count = 0
+        
+        # チェックした画像のインデックスをソート
+        indices = sorted(self.checked_images)
+        
+        for i, idx in enumerate(indices):
+            if idx >= len(self.image_files):
+                continue
+                
+            src_path = self.image_files[idx]
+            file_ext = os.path.splitext(src_path)[1]
+            
+            # 新しいファイル名を生成
+            number = start_number + i
+            new_name = f"{base_name}{number:0{digits}d}{file_ext}"
+            dst_path = os.path.join(os.path.dirname(src_path), new_name)
+            
+            try:
+                # ファイルが存在する場合はスキップ
+                if os.path.exists(dst_path) and src_path != dst_path:
+                    if not messagebox.askyesno("確認", f"ファイル '{new_name}' は既に存在します。上書きしますか？"):
+                        continue
+                
+                os.rename(src_path, dst_path)
+                renamed_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                print(f"リネームエラー: {e}")
+        
+        # 結果表示
+        result_msg = f"{renamed_count}個のファイルをリネームしました。"
+        if error_count > 0:
+            result_msg += f"\n{error_count}個のファイルでエラーが発生しました。"
+            
+        messagebox.showinfo("リネーム完了", result_msg)
+        
+        # リネーム後は画像リストを更新
+        if renamed_count > 0:
+            self.load_images(self.current_folder)
+
+    def convert_checked_images(self):
+        # チェックした画像の形式を変更
+        if not self.checked_images:
+            messagebox.showinfo("情報", "変換する画像が選択されていません。")
+            return
+            
+        # 変換ダイアログを表示
+        convert_dialog = ConvertDialog(self.root)
+        if not convert_dialog.result:
+            return
+            
+        # 変換設定を取得
+        format_type = convert_dialog.format_type
+        quality = convert_dialog.quality
+        
+        # 進捗ダイアログ
+        progress_win = tk.Toplevel(self.root)
+        progress_win.title("変換中")
+        progress_win.geometry("300x100")
+        progress_win.transient(self.root)
+        progress_win.grab_set()
+        
+        progress_lbl = ttk.Label(progress_win, text="ファイルを変換中...")
+        progress_lbl.pack(pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_win, variable=progress_var, maximum=len(self.checked_images))
+        progress_bar.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 変換処理を別スレッドで実行
+        threading.Thread(target=self._convert_files_thread, args=(format_type, quality, progress_win, progress_var, progress_lbl)).start()
+
+    def _convert_files_thread(self, format_type, quality, progress_win, progress_var, progress_lbl):
+        # ファイル変換の実行
+        converted_count = 0
+        error_count = 0
+        
+        for i, idx in enumerate(sorted(self.checked_images)):
+            if idx >= len(self.image_files):
+                continue
+                
+            src_path = self.image_files[idx]
+            file_name = os.path.splitext(os.path.basename(src_path))[0]
+            dst_path = os.path.join(os.path.dirname(src_path), f"{file_name}.{format_type.lower()}")
+            
+            progress_var.set(i + 1)
+            progress_lbl.config(text=f"変換中: {os.path.basename(src_path)}")
+            progress_win.update_idletasks()
+            
+            try:
+                # 画像を開く
+                img = Image.open(src_path)
+                
+                # RGB形式に変換（アルファチャンネルを処理）
+                if img.mode == 'RGBA' and format_type.lower() == 'jpg':
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3])
+                    img = background
+                
+                # 同名ファイルが存在する場合
+                if os.path.exists(dst_path) and src_path != dst_path:
+                    response = messagebox.askyesnocancel(
+                        "確認", 
+                        f"ファイル '{os.path.basename(dst_path)}' は既に存在します。上書きしますか？"
+                    )
+                    
+                    if response is None:  # キャンセル
+                        continue
+                    elif not response:  # いいえ
+                        continue
+                
+                # 保存
+                if format_type.lower() == 'jpg':
+                    img.save(dst_path, 'JPEG', quality=quality)
+                elif format_type.lower() == 'png':
+                    img.save(dst_path, 'PNG')
+                elif format_type.lower() == 'bmp':
+                    img.save(dst_path, 'BMP')
+                
+                converted_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                print(f"変換エラー: {e}")
+        
+        # 処理完了
+        progress_win.destroy()
+        
+        # 結果表示
+        result_msg = f"{converted_count}個のファイルを{format_type}形式に変換しました。"
+        if error_count > 0:
+            result_msg += f"\n{error_count}個のファイルでエラーが発生しました。"
+            
+        messagebox.showinfo("変換完了", result_msg)
+        
+        # 変換後は画像リストを更新
+        if converted_count > 0:
+            self.load_images(self.current_folder)
+
+    def resize_checked_images(self):
+        # チェックした画像をリサイズ
+        if not self.checked_images:
+            messagebox.showinfo("情報", "リサイズする画像が選択されていません。")
+            return
+            
+        # リサイズダイアログを表示
+        resize_dialog = ResizeDialog(self.root)
+        if not resize_dialog.result:
+            return
+            
+        # リサイズ設定を取得
+        resize_mode = resize_dialog.resize_mode
+        width = resize_dialog.width
+        height = resize_dialog.height
+        format_type = resize_dialog.format_type
+        quality = resize_dialog.quality
+        
+        # 進捗ダイアログ
+        progress_win = tk.Toplevel(self.root)
+        progress_win.title("リサイズ中")
+        progress_win.geometry("300x100")
+        progress_win.transient(self.root)
+        progress_win.grab_set()
+        
+        progress_lbl = ttk.Label(progress_win, text="ファイルをリサイズ中...")
+        progress_lbl.pack(pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_win, variable=progress_var, maximum=len(self.checked_images))
+        progress_bar.pack(fill=tk.X, padx=10, pady=10)
+        
+        # リサイズ処理を別スレッドで実行
+        thread_args = (resize_mode, width, height, format_type, quality, progress_win, progress_var, progress_lbl)
+        threading.Thread(target=self._resize_files_thread, args=thread_args).start()
+
+    def _resize_files_thread(self, resize_mode, width, height, format_type, quality, progress_win, progress_var, progress_lbl):
+        # ファイルリサイズの実行
+        resized_count = 0
+        error_count = 0
+        
+        for i, idx in enumerate(sorted(self.checked_images)):
+            if idx >= len(self.image_files):
+                continue
+                
+            src_path = self.image_files[idx]
+            file_name = os.path.splitext(os.path.basename(src_path))[0]
+            
+            # 出力ファイル名を生成
+            if format_type:
+                dst_path = os.path.join(os.path.dirname(src_path), f"{file_name}_resized.{format_type.lower()}")
+            else:
+                ext = os.path.splitext(src_path)[1]
+                dst_path = os.path.join(os.path.dirname(src_path), f"{file_name}_resized{ext}")
+            
+            progress_var.set(i + 1)
+            progress_lbl.config(text=f"リサイズ中: {os.path.basename(src_path)}")
+            progress_win.update_idletasks()
+            
+            try:
+                # 画像を開く
+                img = Image.open(src_path)
+                orig_width, orig_height = img.size
+                
+                # リサイズ方法に応じて処理
+                if resize_mode == "比率を維持":
+                    # アスペクト比を維持
+                    if width and height:
+                        ratio = min(width / orig_width, height / orig_height)
+                    elif width:
+                        ratio = width / orig_width
+                    elif height:
+                        ratio = height / orig_height
+                    else:
+                        ratio = 1.0
+                        
+                    new_width = int(orig_width * ratio)
+                    new_height = int(orig_height * ratio)
+                    resized_img = img.resize((new_width, new_height), Image.LANCZOS)
+                    
+                elif resize_mode == "指定サイズに合わせる":
+                    # 指定サイズに合わせる（余白なし）
+                    if not width:
+                        width = orig_width
+                    if not height:
+                        height = orig_height
+                        
+                    resized_img = img.resize((width, height), Image.LANCZOS)
+                    
+                elif resize_mode == "トリミング":
+                    # アスペクト比を維持しつつ、はみ出た部分をトリミング
+                    if not width:
+                        width = orig_width
+                    if not height:
+                        height = orig_height
+                        
+                    ratio = max(width / orig_width, height / orig_height)
+                    interim_width = int(orig_width * ratio)
+                    interim_height = int(orig_height * ratio)
+                    
+                    interim_img = img.resize((interim_width, interim_height), Image.LANCZOS)
+                    
+                    # 中央部分を切り出し
+                    left = (interim_width - width) // 2
+                    top = (interim_height - height) // 2
+                    right = left + width
+                    bottom = top + height
+                    
+                    resized_img = interim_img.crop((left, top, right, bottom))
+                
+                # RGB形式に変換（アルファチャンネルを処理）
+                if resized_img.mode == 'RGBA' and format_type and format_type.lower() == 'jpg':
+                    background = Image.new('RGB', resized_img.size, (255, 255, 255))
+                    background.paste(resized_img, mask=resized_img.split()[3])
+                    resized_img = background
+                
+                # 同名ファイルが存在する場合
+                if os.path.exists(dst_path):
+                    response = messagebox.askyesnocancel(
+                        "確認", 
+                        f"ファイル '{os.path.basename(dst_path)}' は既に存在します。上書きしますか？"
+                    )
+                    
+                    if response is None or not response:  # キャンセルまたはいいえ
+                        continue
+                
+                # 保存
+                if format_type:
+                    if format_type.lower() == 'jpg':
+                        resized_img.save(dst_path, 'JPEG', quality=quality)
+                    elif format_type.lower() == 'png':
+                        resized_img.save(dst_path, 'PNG')
+                    elif format_type.lower() == 'bmp':
+                        resized_img.save(dst_path, 'BMP')
+                else:
+                    # 元の形式で保存
+                    ext = os.path.splitext(src_path)[1].lower()
+                    if ext == '.jpg' or ext == '.jpeg':
+                        resized_img.save(dst_path, 'JPEG', quality=quality)
+                    elif ext == '.png':
+                        resized_img.save(dst_path, 'PNG')
+                    elif ext == '.bmp':
+                        resized_img.save(dst_path, 'BMP')
+                    else:
+                        resized_img.save(dst_path)
+                
+                resized_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                print(f"リサイズエラー: {e}")
+        
+        # 処理完了
+        progress_win.destroy()
+        
+        # 結果表示
+        result_msg = f"{resized_count}個のファイルをリサイズしました。"
+        if error_count > 0:
+            result_msg += f"\n{error_count}個のファイルでエラーが発生しました。"
+            
+        messagebox.showinfo("リサイズ完了", result_msg)
+        
+        # リサイズ後は画像リストを更新
+        if resized_count > 0:
+            self.load_images(self.current_folder)
+
+    def fill_region_checked_images(self):
+        # チェックした画像の特定領域を塗りつぶし
+        if not self.checked_images:
+            messagebox.showinfo("情報", "処理する画像が選択されていません。")
+            return
+            
+        # 塗りつぶしダイアログを表示
+        fill_dialog = FillRegionDialog(self.root)
+        if not fill_dialog.result:
+            return
+            
+        # 設定を取得
+        x1 = fill_dialog.x1
+        y1 = fill_dialog.y1
+        x2 = fill_dialog.x2
+        y2 = fill_dialog.y2
+        color = fill_dialog.color
+        format_type = fill_dialog.format_type
+        quality = fill_dialog.quality
+        
+        # 進捗ダイアログ
+        progress_win = tk.Toplevel(self.root)
+        progress_win.title("処理中")
+        progress_win.geometry("300x100")
+        progress_win.transient(self.root)
+        progress_win.grab_set()
+        
+        progress_lbl = ttk.Label(progress_win, text="ファイルを処理中...")
+        progress_lbl.pack(pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_win, variable=progress_var, maximum=len(self.checked_images))
+        progress_bar.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 処理を別スレッドで実行
+        thread_args = (x1, y1, x2, y2, color, format_type, quality, progress_win, progress_var, progress_lbl)
+        threading.Thread(target=self._fill_region_thread, args=thread_args).start()
+
+    def _fill_region_thread(self, x1, y1, x2, y2, color, format_type, quality, progress_win, progress_var, progress_lbl):
+        # 塗りつぶし処理の実行
+        processed_count = 0
+        error_count = 0
+        
+        for i, idx in enumerate(sorted(self.checked_images)):
+            if idx >= len(self.image_files):
+                continue
+                
+            src_path = self.image_files[idx]
+            file_name = os.path.splitext(os.path.basename(src_path))[0]
+            
+            # 出力ファイル名を生成
+            if format_type:
+                dst_path = os.path.join(os.path.dirname(src_path), f"{file_name}_filled.{format_type.lower()}")
+            else:
+                ext = os.path.splitext(src_path)[1]
+                dst_path = os.path.join(os.path.dirname(src_path), f"{file_name}_filled{ext}")
+            
+            progress_var.set(i + 1)
+            progress_lbl.config(text=f"処理中: {os.path.basename(src_path)}")
+            progress_win.update_idletasks()
+            
+            try:
+                # 画像を開く
+                img = Image.open(src_path)
+                
+                # 描画用オブジェクト
+                draw = ImageDraw.Draw(img)
+                
+                # 指定領域を塗りつぶし
+                draw.rectangle([x1, y1, x2, y2], fill=color)
+                
+                # RGB形式に変換（アルファチャンネルを処理）
+                if img.mode == 'RGBA' and format_type and format_type.lower() == 'jpg':
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3])
+                    img = background
+                
+                # 同名ファイルが存在する場合
+                if os.path.exists(dst_path):
+                    response = messagebox.askyesnocancel(
+                        "確認", 
+                        f"ファイル '{os.path.basename(dst_path)}' は既に存在します。上書きしますか？"
+                    )
+                    
+                    if response is None or not response:  # キャンセルまたはいいえ
+                        continue
+                
+                # 保存
+                if format_type:
+                    if format_type.lower() == 'jpg':
+                        img.save(dst_path, 'JPEG', quality=quality)
+                    elif format_type.lower() == 'png':
+                        img.save(dst_path, 'PNG')
+                    elif format_type.lower() == 'bmp':
+                        img.save(dst_path, 'BMP')
+                else:
+                    # 元の形式で保存
+                    ext = os.path.splitext(src_path)[1].lower()
+                    if ext == '.jpg' or ext == '.jpeg':
+                        img.save(dst_path, 'JPEG', quality=quality)
+                    elif ext == '.png':
+                        img.save(dst_path, 'PNG')
+                    elif ext == '.bmp':
+                        img.save(dst_path, 'BMP')
+                    else:
+                        img.save(dst_path)
+                
+                processed_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                print(f"処理エラー: {e}")
+        
+        # 処理完了
+        progress_win.destroy()
+        
+        # 結果表示
+        result_msg = f"{processed_count}個のファイルを処理しました。"
+        if error_count > 0:
+            result_msg += f"\n{error_count}個のファイルでエラーが発生しました。"
+            
+        messagebox.showinfo("処理完了", result_msg)
+        
+        # 処理後は画像リストを更新
+        if processed_count > 0:
+            self.load_images(self.current_folder)
+
+    def prev_image(self, event=None):
+        # 前の画像を表示
+        if self.selected_image_index > 0:
+            self.select_image(self.selected_image_index - 1)
+
+    def next_image(self, event=None):
+        # 次の画像を表示
+        if self.selected_image_index < len(self.image_files) - 1:
+            self.select_image(self.selected_image_index + 1)
+
+    def show_help(self):
+        # ヘルプ情報を表示
+        help_text = """
+画像ビューワの使い方:
+
+【基本操作】
+・左側のフォルダツリーからフォルダを選択して画像を表示できます。
+・上部にサムネイルが表示され、クリックで選択できます。
+・サムネイル下のチェックボックスで画像を選択できます。
+・選択した画像は下部に大きく表示されます。
+
+【ショートカットキー】
+・左右矢印キー: 前/次の画像を表示
+・スペースキー: 現在の画像のチェックを切り替え
+
+【画像の操作】
+・「全てチェック」「全てチェック解除」ボタンで一括操作ができます。
+・チェックした画像に対して、コピー、移動、リネーム、形式変更、リサイズ、
+ 領域塗りつぶしの操作ができます。
+
+※チェック状態は自動的に保存され、アプリを再起動しても維持されます。
+        """
+        
+        help_window = tk.Toplevel(self.root)
+        help_window.title("使い方")
+        help_window.geometry("500x400")
+        help_window.transient(self.root)
+        
+        text = tk.Text(help_window, wrap=tk.WORD, padx=10, pady=10)
+        text.pack(fill=tk.BOTH, expand=True)
+        text.insert(tk.END, help_text)
+        text.config(state=tk.DISABLED)
+        
+        close_button = ttk.Button(help_window, text="閉じる", command=help_window.destroy)
+        close_button.pack(pady=10)
+
+    def show_about(self):
+        # バージョン情報を表示
+        about_text = """
+画像ビューワ v1.0
+
+動画から切り出した静止画をチェックするためのアプリケーションです。
+画像のチェック、管理、編集機能を提供します。
+
+© 2025 Your Name
+        """
+        
+        messagebox.showinfo("バージョン情報", about_text)
+
+    def create_tooltip(self, widget, text):
+        # ツールチップの作成
+        tooltip = ToolTip(widget, text)
+        return tooltip
+
+
+class ToolTip:
+    """
+    ウィジェット上にマウスを置いたときに表示されるツールチップ
+    """
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+    
+    def show_tooltip(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+        
+        # ツールチップウィンドウを作成
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        label = ttk.Label(self.tooltip, text=self.text, background="#FFFFDD", relief=tk.SOLID, borderwidth=1)
+        label.pack()
+    
+    def hide_tooltip(self, event=None):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
+
+class RenameDialog:
+    """
+    ファイル名変更ダイアログ
+    """
+    def __init__(self, parent, file_count):
+        self.result = None
+        
+        # ダイアログウィンドウの作成
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("リネーム設定")
+        self.dialog.geometry("400x200")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # ファイル名のベース
+        ttk.Label(self.dialog, text="ファイル名のベース:").grid(row=0, column=0, padx=10, pady=10, sticky=tk.W)
+        self.base_name_var = tk.StringVar(value="image_")
+        ttk.Entry(self.dialog, textvariable=self.base_name_var, width=20).grid(row=0, column=1, padx=10, pady=10)
+        
+        # 開始番号
+        ttk.Label(self.dialog, text="開始番号:").grid(row=1, column=0, padx=10, pady=10, sticky=tk.W)
+        self.start_number_var = tk.IntVar(value=1)
+        ttk.Spinbox(self.dialog, from_=0, to=9999, textvariable=self.start_number_var, width=5).grid(row=1, column=1, padx=10, pady=10, sticky=tk.W)
+        
+        # 桁数
+        ttk.Label(self.dialog, text="桁数:").grid(row=2, column=0, padx=10, pady=10, sticky=tk.W)
+        self.digits_var = tk.IntVar(value=3)
+        ttk.Spinbox(self.dialog, from_=1, to=10, textvariable=self.digits_var, width=5).grid(row=2,

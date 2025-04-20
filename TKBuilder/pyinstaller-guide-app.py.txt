@@ -1,0 +1,345 @@
+import os
+import sys
+import re
+import subprocess
+import threading
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import importlib.util
+import ast
+
+class PyInstallerGuideApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("PyInstaller Guide")
+        self.root.geometry("700x650")
+        self.root.resizable(True, True)
+        
+        # アプリケーションの状態を保持する変数
+        self.python_file = tk.StringVar()
+        self.icon_file = tk.StringVar()
+        self.output_name = tk.StringVar()
+        self.show_console = tk.BooleanVar(value=False)
+        self.output_dir = ""
+        
+        # 依存関係の辞書（ライブラリ名: チェック状態）
+        self.dependencies = {}
+        self.common_libraries = {
+            "numpy": "科学計算ライブラリ",
+            "pandas": "データ分析ライブラリ",
+            "matplotlib": "グラフ描画ライブラリ",
+            "pillow": "画像処理ライブラリ",
+            "opencv-python": "コンピュータビジョンライブラリ",
+            "requests": "HTTP通信ライブラリ",
+            "beautifulsoup4": "HTMLパーサライブラリ",
+            "pygame": "ゲーム開発ライブラリ",
+            "sqlalchemy": "SQLデータベースライブラリ",
+            "pyqt5": "GUIライブラリ",
+            "pyside2": "GUIライブラリ",
+            "wxpython": "GUIライブラリ",
+            "flask": "Webフレームワーク",
+            "django": "Webフレームワーク",
+            "tensorflow": "機械学習ライブラリ",
+            "pytorch": "機械学習ライブラリ",
+            "scikit-learn": "機械学習ライブラリ"
+        }
+        
+        # UIの構築
+        self.create_widgets()
+    
+    def create_widgets(self):
+        # メインフレームの作成
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # ファイル選択セクション
+        file_frame = ttk.LabelFrame(main_frame, text="ファイル設定", padding="10")
+        file_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Pythonファイル選択
+        ttk.Label(file_frame, text="Pythonファイル:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(file_frame, textvariable=self.python_file, width=50).grid(row=0, column=1, padx=5, pady=5)
+        ttk.Button(file_frame, text="参照...", command=self.browse_python_file).grid(row=0, column=2, padx=5, pady=5)
+        
+        # アイコン選択
+        ttk.Label(file_frame, text="アイコン:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(file_frame, textvariable=self.icon_file, width=50).grid(row=1, column=1, padx=5, pady=5)
+        ttk.Button(file_frame, text="参照...", command=self.browse_icon_file).grid(row=1, column=2, padx=5, pady=5)
+        
+        # 出力ファイル名
+        ttk.Label(file_frame, text="出力ファイル名:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(file_frame, textvariable=self.output_name, width=50).grid(row=2, column=1, columnspan=2, padx=5, pady=5, sticky=tk.W+tk.E)
+        
+        # オプションセクション
+        options_frame = ttk.LabelFrame(main_frame, text="オプション", padding="10")
+        options_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # コンソール表示オプション
+        ttk.Checkbutton(options_frame, text="コンソールウィンドウを表示する", variable=self.show_console).pack(anchor=tk.W, pady=5)
+        
+        # 依存関係セクション
+        self.deps_frame = ttk.LabelFrame(main_frame, text="依存関係", padding="10")
+        self.deps_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # スクロール可能な依存関係リスト
+        self.deps_canvas = tk.Canvas(self.deps_frame)
+        scrollbar = ttk.Scrollbar(self.deps_frame, orient="vertical", command=self.deps_canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.deps_canvas)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.deps_canvas.configure(scrollregion=self.deps_canvas.bbox("all"))
+        )
+        
+        self.deps_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.deps_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        self.deps_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # 初期状態では依存関係リストは空
+        ttk.Label(self.scrollable_frame, text="Pythonファイルを選択すると、依存関係が表示されます").grid(row=0, column=0, padx=5, pady=5)
+        
+        # 実行ボタンセクション
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=10)
+        
+        ttk.Button(button_frame, text="EXEを作成", command=self.create_exe, width=20).pack(side=tk.RIGHT, padx=5)
+    
+    def browse_python_file(self):
+        """Pythonファイルを選択するダイアログを表示"""
+        filepath = filedialog.askopenfilename(
+            title="Pythonファイルを選択",
+            filetypes=[("Python Files", "*.py"), ("All Files", "*.*")]
+        )
+        if filepath:
+            self.python_file.set(filepath)
+            # デフォルトの出力ファイル名を設定
+            filename = os.path.splitext(os.path.basename(filepath))[0]
+            self.output_name.set(filename)
+            # 依存関係を解析
+            self.analyze_dependencies(filepath)
+    
+    def browse_icon_file(self):
+        """アイコンファイルを選択するダイアログを表示"""
+        filepath = filedialog.askopenfilename(
+            title="アイコンファイルを選択",
+            filetypes=[("Icon Files", "*.ico"), ("All Files", "*.*")]
+        )
+        if filepath:
+            self.icon_file.set(filepath)
+    
+    def analyze_dependencies(self, filepath):
+        """Pythonファイルの依存関係を解析"""
+        # 既存のウィジェットをクリア
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        # 依存関係辞書をリセット
+        self.dependencies = {}
+        
+        try:
+            # ファイルを読み込む
+            with open(filepath, 'r', encoding='utf-8') as file:
+                source_code = file.read()
+            
+            # ASTを使用してimport文を解析
+            tree = ast.parse(source_code)
+            imports = []
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for name in node.names:
+                        imports.append(name.name.split('.')[0])
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        imports.append(node.module.split('.')[0])
+            
+            # 重複を削除
+            imports = list(set(imports))
+            
+            # 標準ライブラリを除外（簡易的な処理）
+            std_libs = sys.stdlib_module_names
+            imports = [imp for imp in imports if imp not in std_libs]
+            
+            # 依存関係の表示とチェックボックスの作成
+            ttk.Label(self.scrollable_frame, text="検出された依存関係:").grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+            
+            row = 1
+            for imp in imports:
+                self.dependencies[imp] = tk.BooleanVar(value=True)
+                ttk.Checkbutton(self.scrollable_frame, text=imp, variable=self.dependencies[imp]).grid(row=row, column=0, sticky=tk.W)
+                row += 1
+            
+            # 一般的なライブラリのセクション
+            ttk.Label(self.scrollable_frame, text="一般的なライブラリ:").grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=(20, 10))
+            row += 1
+            
+            for lib, desc in self.common_libraries.items():
+                if lib not in self.dependencies:  # まだリストにない場合のみ追加
+                    self.dependencies[lib] = tk.BooleanVar(value=False)
+                    cb = ttk.Checkbutton(self.scrollable_frame, text=f"{lib} - {desc}", variable=self.dependencies[lib])
+                    cb.grid(row=row, column=0, columnspan=2, sticky=tk.W)
+                    row += 1
+            
+        except Exception as e:
+            ttk.Label(self.scrollable_frame, text=f"依存関係の解析中にエラーが発生しました: {str(e)}").grid(row=0, column=0, padx=5, pady=5)
+    
+    def create_exe(self):
+        """PyInstallerを使用してEXEを作成"""
+        # 入力チェック
+        if not self.python_file.get():
+            messagebox.showerror("エラー", "Pythonファイルを選択してください")
+            return
+        
+        # PyInstallerコマンドの構築
+        cmd = ["pyinstaller", "--onefile"]
+        
+        # コンソールウィンドウ表示オプション
+        if not self.show_console.get():
+            cmd.append("--noconsole")
+        
+        # アイコン指定
+        if self.icon_file.get():
+            cmd.extend(["--icon", self.icon_file.get()])
+        
+        # 出力名指定
+        if self.output_name.get():
+            cmd.extend(["--name", self.output_name.get()])
+        
+        # 依存関係の追加
+        hidden_imports = []
+        for lib, checked in self.dependencies.items():
+            if checked.get():
+                hidden_imports.append(lib)
+        
+        for lib in hidden_imports:
+            cmd.extend(["--hidden-import", lib])
+        
+        # Pythonファイルの追加
+        cmd.append(self.python_file.get())
+        
+        # 実行ボタンを無効化
+        for widget in self.root.winfo_children():
+            if isinstance(widget, ttk.Button) and widget["text"] == "EXEを作成":
+                widget.config(state="disabled")
+        
+        # プログレスバーの表示
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("実行中...")
+        progress_window.geometry("400x150")
+        progress_window.transient(self.root)
+        progress_window.grab_set()
+        
+        ttk.Label(progress_window, text="PyInstallerを実行中...").pack(pady=(20, 10))
+        progress = ttk.Progressbar(progress_window, mode="indeterminate")
+        progress.pack(fill=tk.X, padx=20, pady=10)
+        progress.start()
+        
+        # バックグラウンドスレッドでPyInstallerを実行
+        self.thread = threading.Thread(target=self.run_pyinstaller, args=(cmd, progress_window))
+        self.thread.daemon = True
+        self.thread.start()
+    
+    def run_pyinstaller(self, cmd, progress_window):
+        """バックグラウンドでPyInstallerを実行"""
+        try:
+            # コマンドの実行
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
+            stdout, stderr = process.communicate()
+            
+            # ディレクトリパスを取得
+            if process.returncode == 0:
+                # 成功した場合、distディレクトリのパスを取得
+                self.output_dir = os.path.join(os.path.dirname(self.python_file.get()), "dist")
+                self.show_success_dialog(progress_window)
+            else:
+                # エラーがあった場合
+                self.root.after(0, lambda: self.show_error_dialog(stderr, progress_window))
+        except Exception as e:
+            self.root.after(0, lambda: self.show_error_dialog(str(e), progress_window))
+        finally:
+            # 実行ボタンを再度有効化
+            def enable_button():
+                for widget in self.root.winfo_children():
+                    if isinstance(widget, ttk.Frame):
+                        for child in widget.winfo_children():
+                            if isinstance(child, ttk.Button) and child["text"] == "EXEを作成":
+                                child.config(state="normal")
+            
+            self.root.after(0, enable_button)
+    
+    def show_success_dialog(self, progress_window):
+        """成功ダイアログを表示"""
+        progress_window.destroy()
+        
+        success_window = tk.Toplevel(self.root)
+        success_window.title("成功")
+        success_window.geometry("400x150")
+        success_window.transient(self.root)
+        success_window.grab_set()
+        
+        ttk.Label(success_window, text="EXEの作成に成功しました！").pack(pady=(20, 10))
+        
+        button_frame = ttk.Frame(success_window)
+        button_frame.pack(pady=10)
+        
+        ttk.Button(button_frame, text="フォルダを開く", command=lambda: self.open_output_folder(success_window)).pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="OK", command=success_window.destroy).pack(side=tk.LEFT, padx=10)
+    
+    def show_error_dialog(self, error_message, progress_window):
+        """エラーダイアログを表示"""
+        progress_window.destroy()
+        
+        error_window = tk.Toplevel(self.root)
+        error_window.title("エラー")
+        error_window.geometry("600x400")
+        error_window.transient(self.root)
+        error_window.grab_set()
+        
+        ttk.Label(error_window, text="EXEの作成中にエラーが発生しました:").pack(pady=(20, 10))
+        
+        # エラーメッセージを表示するテキストボックス
+        error_text = tk.Text(error_window, wrap=tk.WORD, height=15)
+        error_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        error_text.insert(tk.END, error_message)
+        error_text.config(state="disabled")
+        
+        # スクロールバーの追加
+        scrollbar = ttk.Scrollbar(error_text, command=error_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        error_text.config(yscrollcommand=scrollbar.set)
+        
+        ttk.Button(error_window, text="OK", command=error_window.destroy).pack(pady=10)
+    
+    def open_output_folder(self, window=None):
+        """出力フォルダをエクスプローラーで開く"""
+        if window:
+            window.destroy()
+        
+        if os.path.exists(self.output_dir):
+            # OSに応じてフォルダを開くコマンドを実行
+            if sys.platform == "win32":
+                os.startfile(self.output_dir)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.call(["open", self.output_dir])
+            else:  # Linux
+                subprocess.call(["xdg-open", self.output_dir])
+        else:
+            messagebox.showerror("エラー", "出力フォルダが見つかりません")
+
+
+def main():
+    # Tkinterウィンドウの初期化
+    root = tk.Tk()
+    app = PyInstallerGuideApp(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

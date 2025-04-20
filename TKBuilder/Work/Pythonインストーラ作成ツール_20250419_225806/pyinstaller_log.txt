@@ -1,0 +1,64 @@
+191 INFO: PyInstaller: 6.12.0, contrib hooks: 2025.2
+192 INFO: Python: 3.13.1
+218 INFO: Platform: Windows-11-10.0.22631-SP0
+218 INFO: Python environment: C:\Users\osia3\AppData\Local\Programs\Python\Python313
+219 INFO: wrote C:/Users/osia3/OneDrive/ドキュメント/Projects/TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\Pythonインストーラ作成ツール.spec
+239 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\python313.zip',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\DLLs',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\setuptools\\_vendor',
+ 'C:\\Users\\osia3\\OneDrive\\ドキュメント\\Projects\\TKBuilder']
+1157 INFO: checking Analysis
+1157 INFO: Building Analysis because Analysis-00.toc is non existent
+1157 INFO: Running Analysis Analysis-00.toc
+1157 INFO: Target bytecode optimization level: 0
+1157 INFO: Initializing module dependency graph...
+1159 INFO: Initializing module graph hook caches...
+1171 INFO: Analyzing modules for base_library.zip ...
+2473 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+3110 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+4089 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+5384 INFO: Caching module dependency graph...
+5428 INFO: Looking for Python shared library...
+5437 INFO: Using Python shared library: C:\Users\osia3\AppData\Local\Programs\Python\Python313\python313.dll
+5437 INFO: Analyzing C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\improved-pyinstaller-guide-app.py
+5463 INFO: Processing pre-find-module-path hook 'hook-tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+5464 INFO: TclTkInfo: initializing cached Tcl/Tk info...
+5694 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+5770 INFO: Processing module hooks (post-graph stage)...
+5773 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+5791 INFO: Performing binary vs. data reclassification (927 entries)
+5889 INFO: Looking for ctypes DLLs
+5893 INFO: Analyzing run-time hooks ...
+5895 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+5897 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+5919 INFO: Creating base_library.zip...
+5965 INFO: Looking for dynamic libraries
+6077 INFO: Extra DLL search directories (AddDllDirectory): []
+6077 INFO: Extra DLL search directories (PATH): []
+6318 INFO: Warnings written to C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\build\Pythonインストーラ作成ツール\warn-Pythonインストーラ作成ツール.txt
+6338 INFO: Graph cross-reference written to C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\build\Pythonインストーラ作成ツール\xref-Pythonインストーラ作成ツール.html
+6368 INFO: checking PYZ
+6368 INFO: Building PYZ because PYZ-00.toc is non existent
+6368 INFO: Building PYZ (ZlibArchive) C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\build\Pythonインストーラ作成ツール\PYZ-00.pyz
+6589 INFO: Building PYZ (ZlibArchive) C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\build\Pythonインストーラ作成ツール\PYZ-00.pyz completed successfully.
+6612 INFO: checking PKG
+6612 INFO: Building PKG because PKG-00.toc is non existent
+6612 INFO: Building PKG (CArchive) Pythonインストーラ作成ツール.pkg
+9112 INFO: Building PKG (CArchive) Pythonインストーラ作成ツール.pkg completed successfully.
+9131 INFO: Bootloader C:\Users\osia3\AppData\Local\Programs\Python\Python313\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+9132 INFO: checking EXE
+9132 INFO: Building EXE because EXE-00.toc is non existent
+9132 INFO: Building EXE from EXE-00.toc
+9132 INFO: Copying bootloader EXE to C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\dist\Pythonインストーラ作成ツール.exe
+9190 INFO: Copying icon to EXE
+9238 INFO: Copying 0 resources to EXE
+9238 INFO: Embedding manifest in EXE
+9244 INFO: Appending PKG archive to EXE
+9312 INFO: Fixing EXE headers
+30048 INFO: Building EXE from EXE-00.toc completed successfully.
+30068 INFO: Build complete! The results are available in: C:\Users\osia3\OneDrive\ドキュメント\Projects\TKBuilder\Work\Pythonインストーラ作成ツール_20250419_225806\dist

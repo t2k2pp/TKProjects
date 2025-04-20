@@ -1,0 +1,4 @@
+201 INFO: PyInstaller: 6.12.0, contrib hooks: 2025.2
+201 INFO: Python: 3.13.1
+227 INFO: Platform: Windows-11-10.0.22631-SP0
+227 INFO: Python environment: C:\Users\osia3\AppData\Local\Programs\Python\Python313

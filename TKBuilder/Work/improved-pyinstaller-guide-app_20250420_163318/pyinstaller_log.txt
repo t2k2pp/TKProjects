@@ -1,0 +1,66 @@
+236 INFO: PyInstaller: 6.12.0, contrib hooks: 2025.2
+236 INFO: Python: 3.13.1
+266 INFO: Platform: Windows-11-10.0.22631-SP0
+266 INFO: Python environment: C:\Users\osia3\AppData\Local\Programs\Python\Python313
+273 INFO: wrote D:/Obsidian/Projects/TKProjects/TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\improved-pyinstaller-guide-app.spec
+289 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\python313.zip',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\DLLs',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages',
+ 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\setuptools\\_vendor',
+ 'D:\\Obsidian\\Projects\\TKProjects\\TKBuilder']
+pygame 2.6.1 (SDL 2.28.4, Python 3.13.1)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+1568 INFO: checking Analysis
+1568 INFO: Building Analysis because Analysis-00.toc is non existent
+1568 INFO: Running Analysis Analysis-00.toc
+1568 INFO: Target bytecode optimization level: 0
+1569 INFO: Initializing module dependency graph...
+1571 INFO: Initializing module graph hook caches...
+1656 INFO: Analyzing modules for base_library.zip ...
+3322 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+5485 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+7291 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+8951 INFO: Caching module dependency graph...
+8990 INFO: Looking for Python shared library...
+8998 INFO: Using Python shared library: C:\Users\osia3\AppData\Local\Programs\Python\Python313\python313.dll
+8998 INFO: Analyzing D:\Obsidian\Projects\TKProjects\TKBuilder\improved-pyinstaller-guide-app.py
+9025 INFO: Processing pre-find-module-path hook 'hook-tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+9028 INFO: TclTkInfo: initializing cached Tcl/Tk info...
+9336 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+9478 INFO: Processing module hooks (post-graph stage)...
+9481 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks'
+9501 INFO: Performing binary vs. data reclassification (927 entries)
+14010 INFO: Looking for ctypes DLLs
+14015 INFO: Analyzing run-time hooks ...
+14017 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+14039 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'C:\\Users\\osia3\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+14078 INFO: Creating base_library.zip...
+14129 INFO: Looking for dynamic libraries
+14248 INFO: Extra DLL search directories (AddDllDirectory): []
+14248 INFO: Extra DLL search directories (PATH): []
+14518 INFO: Warnings written to D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\build\improved-pyinstaller-guide-app\warn-improved-pyinstaller-guide-app.txt
+14538 INFO: Graph cross-reference written to D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\build\improved-pyinstaller-guide-app\xref-improved-pyinstaller-guide-app.html
+14618 INFO: checking PYZ
+14618 INFO: Building PYZ because PYZ-00.toc is non existent
+14618 INFO: Building PYZ (ZlibArchive) D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\build\improved-pyinstaller-guide-app\PYZ-00.pyz
+14829 INFO: Building PYZ (ZlibArchive) D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\build\improved-pyinstaller-guide-app\PYZ-00.pyz completed successfully.
+14852 INFO: checking PKG
+14852 INFO: Building PKG because PKG-00.toc is non existent
+14852 INFO: Building PKG (CArchive) improved-pyinstaller-guide-app.pkg
+17273 INFO: Building PKG (CArchive) improved-pyinstaller-guide-app.pkg completed successfully.
+17296 INFO: Bootloader C:\Users\osia3\AppData\Local\Programs\Python\Python313\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+17296 INFO: checking EXE
+17296 INFO: Building EXE because EXE-00.toc is non existent
+17296 INFO: Building EXE from EXE-00.toc
+17303 INFO: Copying bootloader EXE to D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\dist\improved-pyinstaller-guide-app.exe
+17363 INFO: Copying icon to EXE
+17423 INFO: Copying 0 resources to EXE
+17423 INFO: Embedding manifest in EXE
+17429 INFO: Appending PKG archive to EXE
+17495 INFO: Fixing EXE headers
+38246 INFO: Building EXE from EXE-00.toc completed successfully.
+38272 INFO: Build complete! The results are available in: D:\Obsidian\Projects\TKProjects\TKBuilder\Work\improved-pyinstaller-guide-app_20250420_163318\dist

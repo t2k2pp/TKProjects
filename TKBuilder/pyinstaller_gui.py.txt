@@ -1,0 +1,330 @@
+import tkinter as tk
+from tkinter import ttk  # For themed widgets
+from tkinter import filedialog, messagebox
+import subprocess
+import os
+import sys
+import threading # To run PyInstaller in a separate thread
+
+# --- Constants ---
+DEFAULT_OUTPUT_DIR = "dist"
+
+# --- Helper Functions ---
+
+def browse_py_file(entry_widget, name_entry_widget):
+    """Opens a file dialog to select a Python script and updates the entry fields."""
+    filepath = filedialog.askopenfilename(
+        title="Python スクリプトを選択",
+        filetypes=[("Python Files", "*.py"), ("All Files", "*.*")]
+    )
+    if filepath:
+        entry_widget.delete(0, tk.END)
+        entry_widget.insert(0, filepath)
+        # Set default EXE name based on script name (without extension)
+        default_name = os.path.splitext(os.path.basename(filepath))[0]
+        name_entry_widget.delete(0, tk.END)
+        name_entry_widget.insert(0, default_name)
+
+def browse_ico_file(entry_widget):
+    """Opens a file dialog to select an icon file and updates the entry field."""
+    filepath = filedialog.askopenfilename(
+        title="アイコンファイルを選択",
+        filetypes=[("Icon Files", "*.ico"), ("All Files", "*.*")]
+    )
+    if filepath:
+        entry_widget.delete(0, tk.END)
+        entry_widget.insert(0, filepath)
+
+def open_output_folder(output_path):
+    """Opens the specified folder in the default file explorer."""
+    try:
+        # Use os.startfile on Windows, open on macOS, xdg-open on Linux
+        if sys.platform == "win32":
+            os.startfile(os.path.realpath(output_path))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", os.path.realpath(output_path)])
+        else:
+            subprocess.Popen(["xdg-open", os.path.realpath(output_path)])
+    except Exception as e:
+        messagebox.showerror("エラー", f"フォルダを開けませんでした: {e}")
+
+def run_pyinstaller(command, progress_bar, status_label, create_button, root, output_exe_path):
+    """Runs the PyInstaller command in a separate thread and updates the UI."""
+    try:
+        status_label.config(text="PyInstaller 実行中...")
+        progress_bar.start(10) # Indeterminate progress
+        create_button.config(state=tk.DISABLED) # Disable button during run
+
+        # Run PyInstaller using subprocess
+        # Use CREATE_NO_WINDOW flag on Windows to hide the console window of the subprocess
+        startupinfo = None
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE # Hide console window
+
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8', # Explicitly set encoding
+            errors='replace', # Handle potential encoding errors
+            startupinfo=startupinfo
+        )
+
+        # Wait for completion and capture output
+        stdout_output, stderr_output = process.communicate()
+        retval = process.returncode
+
+        progress_bar.stop()
+        progress_bar['value'] = 0
+        create_button.config(state=tk.NORMAL) # Re-enable button
+
+        if retval == 0:
+            status_label.config(text="EXE 作成完了！")
+            # Show success message with option to open folder
+            show_success_dialog(root, output_exe_path)
+        else:
+            status_label.config(text="エラーが発生しました。")
+            print("--- PyInstaller stdout ---")
+            print(stdout_output)
+            print("--- PyInstaller stderr ---")
+            print(stderr_output)
+            messagebox.showerror(
+                "PyInstaller エラー",
+                f"EXE の作成に失敗しました。\nReturn Code: {retval}\n\n詳細:\n{stderr_output[-1000:]}" # Show last 1000 chars of error
+            )
+
+    except FileNotFoundError:
+        progress_bar.stop()
+        progress_bar['value'] = 0
+        create_button.config(state=tk.NORMAL)
+        status_label.config(text="エラー")
+        messagebox.showerror("エラー", "PyInstaller が見つかりません。\nPATH 環境変数を確認するか、PyInstaller をインストールしてください。")
+    except Exception as e:
+        progress_bar.stop()
+        progress_bar['value'] = 0
+        create_button.config(state=tk.NORMAL)
+        status_label.config(text="エラー")
+        messagebox.showerror("予期せぬエラー", f"エラーが発生しました: {e}")
+
+
+def create_exe(script_entry, icon_entry, name_entry, noconsole_var, progress_bar, status_label, create_button, root):
+    """Gathers options and starts the PyInstaller process in a thread."""
+    script_path = script_entry.get()
+    icon_path = icon_entry.get()
+    exe_name = name_entry.get()
+    use_noconsole = noconsole_var.get()
+
+    # --- Input Validation ---
+    if not script_path or not os.path.isfile(script_path):
+        messagebox.showerror("エラー", "有効な Python スクリプトファイルを選択してください。")
+        return
+    if not exe_name:
+        messagebox.showerror("エラー", "EXE ファイル名を入力してください。")
+        return
+    if icon_path and not os.path.isfile(icon_path):
+        messagebox.showerror("エラー", "有効なアイコンファイルを選択するか、空欄にしてください。")
+        return
+
+    # --- Construct PyInstaller Command ---
+    command = [
+        sys.executable, # Use the current Python interpreter to run pyinstaller module
+        "-m", "PyInstaller",
+        script_path,
+        "--onefile", # Always use onefile based on user request context
+        f"--name={exe_name}",
+        "--distpath", DEFAULT_OUTPUT_DIR, # Specify output directory
+        "--clean", # Clean PyInstaller cache and remove temporary files before building
+        # "--log-level=WARN" # Reduce console output verbosity (optional)
+    ]
+
+    if use_noconsole:
+        command.append("--windowed") # or --noconsole
+
+    if icon_path:
+        command.append(f"--icon={icon_path}")
+
+    # --- Define output path for success message ---
+    # Ensure the output directory exists before getting the full path
+    if not os.path.exists(DEFAULT_OUTPUT_DIR):
+         os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True) # Create if not exists
+    output_exe_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{exe_name}.exe")
+
+
+    # --- Run in a separate thread to keep UI responsive ---
+    thread = threading.Thread(
+        target=run_pyinstaller,
+        args=(command, progress_bar, status_label, create_button, root, output_exe_path),
+        daemon=True # Allows closing the main window even if thread is running
+    )
+    thread.start()
+
+
+def show_success_dialog(parent, output_path):
+    """Shows a custom success dialog with an 'Open Folder' button."""
+    dialog = tk.Toplevel(parent)
+    dialog.title("成功")
+    dialog.geometry("300x120")
+    dialog.resizable(False, False)
+    # Center the dialog relative to the parent
+    parent.update_idletasks() # Ensure parent dimensions are up-to-date
+    parent_x = parent.winfo_x()
+    parent_y = parent.winfo_y()
+    parent_width = parent.winfo_width()
+    parent_height = parent.winfo_height()
+    dialog_width = 300
+    dialog_height = 120
+    dialog_x = parent_x + (parent_width // 2) - (dialog_width // 2)
+    dialog_y = parent_y + (parent_height // 2) - (dialog_height // 2)
+    dialog.geometry(f"+{dialog_x}+{dialog_y}")
+
+
+    # Message Label
+    message_label = ttk.Label(dialog, text="EXE ファイルの作成に成功しました！", justify=tk.CENTER)
+    message_label.pack(pady=(15, 10))
+
+    # Button Frame
+    button_frame = ttk.Frame(dialog)
+    button_frame.pack(pady=10)
+
+    # OK Button
+    ok_button = ttk.Button(button_frame, text="OK", command=dialog.destroy, width=10)
+    ok_button.pack(side=tk.LEFT, padx=5)
+
+    # Open Folder Button
+    folder_button = ttk.Button(
+        button_frame,
+        text="フォルダを開く",
+        # Pass the directory containing the exe
+        command=lambda: open_output_folder(os.path.dirname(output_path)),
+        width=15
+    )
+    folder_button.pack(side=tk.LEFT, padx=5)
+
+    dialog.transient(parent) # Keep dialog on top of parent
+    dialog.grab_set()       # Make dialog modal
+    parent.wait_window(dialog) # Wait until dialog is closed
+
+
+# --- Main Application Class ---
+
+class PyInstallerGUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("PyInstaller GUI")
+        # Increased height slightly and made resizable
+        self.geometry("550x400")
+        self.resizable(True, True) # Allow resizing
+
+        # --- Style Configuration (moved inside __init__) ---
+        self.style = ttk.Style(self)
+        self.style.theme_use('clam') # Use a modern theme if available
+
+        # Configure Accent button style (example, might vary by theme/OS)
+        try:
+            # Define the style *after* the main style object is created
+            self.style.configure('Accent.TButton', foreground='white', background='#0078D4') # Example blue
+        except tk.TclError:
+            print("Note: Accent button style might not be fully supported by the current theme.")
+
+
+        # --- Main Frame ---
+        # Use pack propagation to prevent frame from shrinking to content
+        main_frame = ttk.Frame(self, padding="15")
+        main_frame.pack(expand=True, fill=tk.BOTH)
+        # main_frame.pack_propagate(False) # Prevent frame resizing based on content (optional)
+
+
+        # --- Input Script ---
+        script_frame = ttk.LabelFrame(main_frame, text="Python スクリプト", padding="10")
+        script_frame.pack(fill=tk.X, pady=5, padx=5) # Added padx
+
+        self.script_entry = ttk.Entry(script_frame) # Removed width, let it expand
+        self.script_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
+        self.script_button = ttk.Button(
+            script_frame,
+            text="参照...",
+            command=lambda: browse_py_file(self.script_entry, self.name_entry) # Pass name entry too
+        )
+        self.script_button.pack(side=tk.LEFT)
+
+        # --- Icon File ---
+        icon_frame = ttk.LabelFrame(main_frame, text="アイコンファイル (.ico)", padding="10")
+        icon_frame.pack(fill=tk.X, pady=5, padx=5) # Added padx
+
+        self.icon_entry = ttk.Entry(icon_frame) # Removed width
+        self.icon_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
+        self.icon_button = ttk.Button(
+            icon_frame,
+            text="参照...",
+            command=lambda: browse_ico_file(self.icon_entry)
+        )
+        self.icon_button.pack(side=tk.LEFT)
+
+        # --- Output Name ---
+        name_frame = ttk.LabelFrame(main_frame, text="出力 EXE 名", padding="10")
+        name_frame.pack(fill=tk.X, pady=5, padx=5) # Added padx
+
+        self.name_entry = ttk.Entry(name_frame) # Removed width
+        self.name_entry.pack(fill=tk.X)
+
+        # --- Options ---
+        options_frame = ttk.Frame(main_frame, padding=(10, 5)) # Added padding
+        options_frame.pack(fill=tk.X, pady=5, padx=5) # Added padx
+
+        self.noconsole_var = tk.BooleanVar(value=True) # Default to hiding console
+        self.noconsole_check = ttk.Checkbutton(
+            options_frame,
+            text="コンソールウィンドウを非表示にする (--windowed)",
+            variable=self.noconsole_var
+        )
+        self.noconsole_check.pack(anchor=tk.W) # Align left
+
+        # --- Status & Progress ---
+        status_frame = ttk.Frame(main_frame, padding=(10, 5)) # Added padding
+        status_frame.pack(fill=tk.X, pady=5, padx=5) # Added padx
+
+        self.status_label = ttk.Label(status_frame, text="準備完了")
+        self.status_label.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.progress_bar = ttk.Progressbar(
+            status_frame,
+            orient=tk.HORIZONTAL,
+            mode='indeterminate', # Use indeterminate for unknown duration
+        )
+        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True) # Let progress bar expand
+
+
+        # --- Create Button ---
+        # Place button in its own frame for better centering/padding control
+        button_container = ttk.Frame(main_frame, padding=(0, 10))
+        button_container.pack(fill=tk.X) # Fill horizontally
+
+        self.create_button = ttk.Button(
+            button_container, # Pack inside the container frame
+            text="EXE を作成",
+            style='Accent.TButton', # Style for emphasis
+            command=lambda: create_exe(
+                self.script_entry,
+                self.icon_entry,
+                self.name_entry,
+                self.noconsole_var,
+                self.progress_bar,
+                self.status_label,
+                self.create_button,
+                self # Pass root window
+            )
+        )
+        # Pack button in the center of its container
+        self.create_button.pack(pady=5, ipady=5)
+
+
+# --- Run the Application ---
+if __name__ == "__main__":
+    app = PyInstallerGUI()
+    app.mainloop()
+
