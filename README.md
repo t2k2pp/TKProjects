@@ -9,7 +9,7 @@
 |---|---|---|
 |動画・画像|TKAniGifBuilder|アニメーションGIFを作成するツール|
 |OS/Tools|TKBuilder|実行モジュールを作成するツール。現状ウイルス系と勘違いされるモジュールができてしまうorz|
-|生成AI|TKChatGPTChat|ChatGPTとチャットするアプリ:Azure ChatGPT 4o は会話できるが o4-miniとかはできない|
+|生成AI|TKChatGPTChat|ChatGPTとチャットするアプリ:azure-chatgpt-tkinter.py(Azure ChatGPT 4o 向け),azureChatGPTCompact.py(o3/o4-mini対応),azureChatGptApp.py(o3/o4-mini対応)|
 |OS/Tools|TKDiffTool|Diffツール|
 |OS/Tools|TKEmojiViewer|絵文字チェックツール。ただし昔懐かし白黒の絵文字になる|
 |OS/Tools|TKFileLockDetecter|ファイルロックしているアプリを見つけるツール。まだ未検証|
