@@ -7,6 +7,7 @@
 
 |カテゴリ|フォルダ名|概要|
 |---|---|---|
+|動画・画像|TKSprite|スプライト画像を作成するツール|
 |動画・画像|TKAniGifBuilder|アニメーションGIFを作成するツール|
 |OS/Tools|TKBuilder|実行モジュールを作成するツール。現状ウイルス系と勘違いされるモジュールができてしまうorz|
 |生成AI|TKChatGPTChat|ChatGPTとチャットするアプ<br>・azure-chatgpt-tkinter.py(Azure ChatGPT 4o 向け)<br>・azureChatGPTCompact.py(o3/o4-mini対応)...2025/04/21<br>・azureChatGptApp.py(o3/o4-mini対応)...2025/04/21<br>・azure_openai_app.py(o3/o4-mini対応)...2025/04/25|
@@ -26,4 +27,11 @@
 |OS/Tools|TKTaskbar|独自タスクバー|
 |動画・画像|TKThumbViewer|サムネイルビューワー|
 |動画・画像|TKViewer|サムネイルビューワー|
+
+
+TKSprite × ImageFx(Google)
+![image](./Image_fx.jpg)
+![image](./Image_fx%20(1).jpg)
+![image](./Image_fx%20(2).jpg)
+![image](./Image_fx%20(3).jpg)
 
